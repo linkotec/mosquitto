@@ -371,6 +371,8 @@ FILE *_mosquitto_fopen(const char *path, const char *mode, bool restrict_read)
 			char username[UNLEN + 1];
 			int ulen = UNLEN;
 			SECURITY_DESCRIPTOR sd;
+			int fd;
+			FILE *fptr;
 
 			GetUserName(username, &ulen);
 			if (!InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION)) {
@@ -397,12 +399,12 @@ FILE *_mosquitto_fopen(const char *path, const char *mode, bool restrict_read)
 
 			LocalFree(pacl);
 
-			int fd = _open_osfhandle((intptr_t)hfile, 0);
+			fd = _open_osfhandle((intptr_t)hfile, 0);
 			if (fd < 0) {
 				return NULL;
 			}
 
-			FILE *fptr = _fdopen(fd, mode);
+			fptr = _fdopen(fd, mode);
 			if (!fptr) {
 				_close(fd);
 				return NULL;
