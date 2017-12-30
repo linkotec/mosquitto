@@ -387,7 +387,7 @@ int mqtt3_bridge_connect(struct mosquitto_db *db, struct mosquitto *context)
 	rc = _mosquitto_send_connect(context, context->keepalive, context->clean_session);
 	if(rc == MOSQ_ERR_SUCCESS){
 		return MOSQ_ERR_SUCCESS;
-	}else if(rc == MOSQ_ERR_ERRNO && errno == ENOTCONN){
+	}else if(rc == MOSQ_ERR_ERRNO && errno == COMPAT_ENOTCONN){
 		return MOSQ_ERR_SUCCESS;
 	}else{
 		if(rc == MOSQ_ERR_TLS){

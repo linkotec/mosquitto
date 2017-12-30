@@ -34,10 +34,14 @@ struct mosquitto_db;
 #  define COMPAT_CLOSE(a) closesocket(a)
 #  define COMPAT_ECONNRESET WSAECONNRESET
 #  define COMPAT_EWOULDBLOCK WSAEWOULDBLOCK
+#  define COMPAT_EINPROGRESS WSAEINPROGRESS
+#  define COMPAT_ENOTCONN WSAENOTCONN
 #else
 #  define COMPAT_CLOSE(a) close(a)
 #  define COMPAT_ECONNRESET ECONNRESET
 #  define COMPAT_EWOULDBLOCK EWOULDBLOCK
+#  define COMPAT_EINPROGRESS EINPROGRESS
+#  define COMPAT_ENOTCONN ENOTCONN
 #endif
 
 /* For when not using winsock libraries. */
