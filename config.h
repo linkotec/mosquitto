@@ -11,9 +11,14 @@
  *
  * Generally for Windows native support.
  * ============================================================ */
-#if defined(_MSC_VER) && _MSC_VER < 1900
-#  define snprintf sprintf_s
-#  define EPROTO ECONNABORTED
+#if defined(_MSC_VER)
+#  if _MSC_VER < 1900
+#    define snprintf sprintf_s
+#  endif
+#  if _MSC_VER < 1600
+#    define ECONNABORTED    106
+#    define EPROTO          ECONNABORTED
+#  endif
 #endif
 
 #ifdef WIN32
