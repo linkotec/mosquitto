@@ -938,7 +938,7 @@ int mosquitto_loop(struct mosquitto *mosq, int timeout, int max_packets)
 #ifdef WIN32
 		errno = WSAGetLastError();
 #endif
-		if(errno == EINTR){
+		if(errno == COMPAT_EINTR){
 			return MOSQ_ERR_SUCCESS;
 		}else{
 			return MOSQ_ERR_ERRNO;
