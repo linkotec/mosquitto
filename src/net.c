@@ -70,7 +70,7 @@ static void net__print_error(int log, const char *format_str)
 	char *buf;
 
 	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-			NULL, WSAGetLastError(), LANG_NEUTRAL, &buf, 0, NULL);
+			NULL, WSAGetLastError(), LANG_NEUTRAL, (LPTSTR) &buf, 0, NULL);
 
 	_mosquitto_log_printf(NULL, log, format_str, buf);
 	LocalFree(buf);
