@@ -174,7 +174,7 @@ int mosquitto_reinitialise(struct mosquitto *mosq, const char *id, bool clean_se
 	mosq->out_packet = NULL;
 	mosq->current_out_packet = NULL;
 	mosq->last_msg_in = mosquitto_time();
-	mosq->next_msg_out = mosquitto_time() + mosq->keepalive;
+	mosq->next_msg_out = mosq->last_msg_in + mosq->keepalive;
 	mosq->ping_t = 0;
 	mosq->last_mid = 0;
 	mosq->state = mosq_cs_new;

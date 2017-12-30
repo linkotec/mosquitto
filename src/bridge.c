@@ -153,7 +153,7 @@ int mqtt3_bridge_connect_step1(struct mosquitto_db *db, struct mosquitto *contex
 	context->state = mosq_cs_new;
 	context->sock = INVALID_SOCKET;
 	context->last_msg_in = mosquitto_time();
-	context->next_msg_out = mosquitto_time() + context->bridge->keepalive;
+	context->next_msg_out = context->last_msg_in + context->bridge->keepalive;
 	context->keepalive = context->bridge->keepalive;
 	context->clean_session = context->bridge->clean_session;
 	context->in_packet.payload = NULL;
@@ -304,7 +304,7 @@ int mqtt3_bridge_connect(struct mosquitto_db *db, struct mosquitto *context)
 	context->state = mosq_cs_new;
 	context->sock = INVALID_SOCKET;
 	context->last_msg_in = mosquitto_time();
-	context->next_msg_out = mosquitto_time() + context->bridge->keepalive;
+	context->next_msg_out = context->last_msg_in + context->bridge->keepalive;
 	context->keepalive = context->bridge->keepalive;
 	context->clean_session = context->bridge->clean_session;
 	context->in_packet.payload = NULL;
