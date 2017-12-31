@@ -824,11 +824,11 @@ static int mosquitto__urldecode(char *str)
 static int mosquitto__parse_socks_url(struct mosq_config *cfg, char *url)
 {
 	char *str;
-	int i;
+	size_t i;
 	char *username = NULL, *password = NULL, *host = NULL, *port = NULL;
 	char *username_or_host = NULL;
-	int start;
-	int len;
+	size_t start;
+	size_t len;
 	bool have_auth = false;
 	int port_int;
 
@@ -861,6 +861,9 @@ static int mosquitto__parse_socks_url(struct mosq_config *cfg, char *url)
 				}
 				len = i-start;
 				host = malloc(len + 1);
+				if(!host){
+					goto out_of_memory;
+				}
 				memcpy(host, &(str[start]), len);
 				host[len] = '\0';
 				start = i+1;
@@ -870,6 +873,9 @@ static int mosquitto__parse_socks_url(struct mosq_config *cfg, char *url)
 				 * socks5h://username:password@host[:port] */
 				len = i-start;
 				username_or_host = malloc(len + 1);
+				if(!username_or_host){
+					goto out_of_memory;
+				}
 				memcpy(username_or_host, &(str[start]), len);
 				username_or_host[len] = '\0';
 				start = i+1;
@@ -886,6 +892,9 @@ static int mosquitto__parse_socks_url(struct mosq_config *cfg, char *url)
 
 				len = i-start;
 				password = malloc(len + 1);
+				if(!password){
+					goto out_of_memory;
+				}
 				memcpy(password, &(str[start]), len);
 				password[len] = '\0';
 				start = i+1;
@@ -898,6 +907,9 @@ static int mosquitto__parse_socks_url(struct mosq_config *cfg, char *url)
 				}
 				len = i-start;
 				username = malloc(len + 1);
+				if(!username){
+					goto out_of_memory;
+				}
 				memcpy(username, &(str[start]), len);
 				username[len] = '\0';
 				start = i+1;
@@ -912,6 +924,9 @@ static int mosquitto__parse_socks_url(struct mosq_config *cfg, char *url)
 			/* Have already seen a @ , so this must be of form
 			 * socks5h://username[:password]@host:port */
 			port = malloc(len + 1);
+			if(!port){
+				goto out_of_memory;
+			}
 			memcpy(port, &(str[start]), len);
 			port[len] = '\0';
 		}else if(username_or_host){
@@ -920,13 +935,15 @@ static int mosquitto__parse_socks_url(struct mosq_config *cfg, char *url)
 			host = username_or_host;
 			username_or_host = NULL;
 			port = malloc(len + 1);
+			if(!port){
+				goto out_of_memory;
+            }
 			memcpy(port, &(str[start]), len);
 			port[len] = '\0';
 		}else{
 			host = malloc(len + 1);
 			if(!host){
-				fprintf(stderr, "Error: Out of memory.\n");
-				goto cleanup;
+				goto out_of_memory;
 			}
 			memcpy(host, &(str[start]), len);
 			host[len] = '\0';
@@ -961,6 +978,9 @@ static int mosquitto__parse_socks_url(struct mosq_config *cfg, char *url)
 	cfg->socks5_port = port_int;
 
 	return 0;
+
+out_of_memory:
+	fprintf(stderr, "Error: Out of memory.\n");
 cleanup:
 	if(username_or_host) free(username_or_host);
 	if(username) free(username);
