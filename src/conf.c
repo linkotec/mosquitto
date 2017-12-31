@@ -255,6 +255,7 @@ void mqtt3_config_cleanup(struct mqtt3_config *config)
 	if(config->persistence_filepath) _mosquitto_free(config->persistence_filepath);
 	if(config->psk_file) _mosquitto_free(config->psk_file);
 	if(config->pid_file) _mosquitto_free(config->pid_file);
+	if(config->user) _mosquitto_free(config->user);
 	if(config->listeners){
 		for(i=0; i<config->listener_count; i++){
 			if(config->listeners[i].host) _mosquitto_free(config->listeners[i].host);
@@ -473,7 +474,7 @@ int mqtt3_config_parse_args(struct mqtt3_config *config, int argc, char *argv[])
 
 	/* Default to drop to mosquitto user if we are privileged and no user specified. */
 	if(!config->user){
-		config->user = "mosquitto";
+		config->user = _mosquitto_strdup("mosquitto");
 	}
 	if(config->verbose){
 		config->log_type = INT_MAX;
@@ -534,7 +535,7 @@ int mqtt3_config_read(struct mqtt3_config *config, bool reload)
 	 * remain here even though it is covered in mqtt3_parse_args() because this
 	 * function may be called on its own. */
 	if(!config->user){
-		config->user = "mosquitto";
+		config->user = _mosquitto_strdup("mosquitto");
 	}
 
 	mqtt3_db_limits_set(cr.max_inflight_messages, cr.max_queued_messages);
