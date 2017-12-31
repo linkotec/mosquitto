@@ -42,10 +42,10 @@ static int _db_restore_sub(struct mosquitto_db *db, const char *client_id, const
 
 static struct mosquitto *_db_find_or_add_context(struct mosquitto_db *db, const char *client_id, uint16_t last_mid)
 {
-	struct mosquitto *context;
+	struct mosquitto *context = NULL;
+	size_t client_id_len = strlen(client_id);
 
-	context = NULL;
-	HASH_FIND(hh_id, db->contexts_by_id, client_id, strlen(client_id), context);
+	HASH_FIND(hh_id, db->contexts_by_id, client_id, client_id_len, context);
 	if(!context){
 		context = mqtt3_context_init(db, -1);
 		if(!context) return NULL;
@@ -57,7 +57,7 @@ static struct mosquitto *_db_find_or_add_context(struct mosquitto_db *db, const 
 
 		context->clean_session = false;
 
-		HASH_ADD_KEYPTR(hh_id, db->contexts_by_id, context->id, strlen(context->id), context);
+		HASH_ADD_KEYPTR(hh_id, db->contexts_by_id, context->id, client_id_len, context);
 	}
 	if(last_mid){
 		context->last_mid = last_mid;

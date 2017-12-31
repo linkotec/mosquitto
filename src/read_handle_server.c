@@ -92,7 +92,7 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 	struct _mosquitto_acl_user *acl_tail;
 	struct mosquitto_client_msg *msg_tail, *msg_prev;
 	struct mosquitto *found_context;
-	int slen;
+	size_t client_id_len;
 	struct _mosquitto_subleaf *leaf;
 	int i;
 #ifdef WITH_TLS
@@ -201,8 +201,8 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		goto handle_connect_error;
 	}
 
-	slen = strlen(client_id);
-	if(slen == 0){
+	client_id_len = strlen(client_id);
+	if(client_id_len == 0){
 		if(context->protocol == mosq_p_mqtt31){
 			_mosquitto_send_connack(context, 0, CONNACK_REFUSED_IDENTIFIER_REJECTED);
 			rc = MOSQ_ERR_PROTOCOL;
@@ -221,6 +221,7 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 					rc = MOSQ_ERR_NOMEM;
 					goto handle_connect_error;
 				}
+				client_id_len = strlen(client_id);
 			}
 		}
 	}
@@ -250,14 +251,14 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		}
 
 		if(context->listener && context->listener->mount_point){
-			slen = strlen(context->listener->mount_point) + strlen(will_topic) + 1;
-			will_topic_mount = _mosquitto_malloc(slen+1);
+			size_t buffer_len = strlen(context->listener->mount_point) + strlen(will_topic) + 1;
+			will_topic_mount = _mosquitto_malloc(buffer_len+1);
 			if(!will_topic_mount){
 				rc = MOSQ_ERR_NOMEM;
 				goto handle_connect_error;
 			}
-			snprintf(will_topic_mount, slen, "%s%s", context->listener->mount_point, will_topic);
-			will_topic_mount[slen] = '\0';
+			snprintf(will_topic_mount, buffer_len, "%s%s", context->listener->mount_point, will_topic);
+			will_topic_mount[buffer_len] = '\0';
 
 			_mosquitto_free(will_topic);
 			will_topic = will_topic_mount;
@@ -429,6 +430,7 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 				rc = MOSQ_ERR_NOMEM;
 				goto handle_connect_error;
 			}
+            client_id_len = strlen(client_id);
 		}else{
 			_mosquitto_send_connack(context, 0, CONNACK_REFUSED_NOT_AUTHORIZED);
 			rc = 1;
@@ -437,7 +439,7 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 	}
 
 	/* Find if this client already has an entry. This must be done *after* any security checks. */
-	HASH_FIND(hh_id, db->contexts_by_id, client_id, strlen(client_id), found_context);
+	HASH_FIND(hh_id, db->contexts_by_id, client_id, client_id_len, found_context);
 	if(found_context){
 		/* Found a matching client */
 		if(found_context->sock == INVALID_SOCKET){
@@ -579,7 +581,7 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		}
 	}
 
-	HASH_ADD_KEYPTR(hh_id, db->contexts_by_id, context->id, strlen(context->id), context);
+	HASH_ADD_KEYPTR(hh_id, db->contexts_by_id, context->id, client_id_len, context);
 
 #ifdef WITH_PERSISTENCE
 	if(!clean_session){

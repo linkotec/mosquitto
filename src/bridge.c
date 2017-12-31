@@ -49,6 +49,7 @@ int mqtt3_bridge_new(struct mosquitto_db *db, struct _mqtt3_bridge *bridge)
 	char hostname[256];
 	int len;
 	char *id, *local_id;
+	size_t local_id_len;
 
 	assert(db);
 	assert(bridge);
@@ -85,7 +86,8 @@ int mqtt3_bridge_new(struct mosquitto_db *db, struct _mqtt3_bridge *bridge)
 		}
 	}
 
-	HASH_FIND(hh_id, db->contexts_by_id, local_id, strlen(local_id), new_context);
+	local_id_len = strlen(local_id);
+	HASH_FIND(hh_id, db->contexts_by_id, local_id, local_id_len, new_context);
 	if(new_context){
 		/* (possible from persistent db) */
 		_mosquitto_free(local_id);
@@ -97,7 +99,7 @@ int mqtt3_bridge_new(struct mosquitto_db *db, struct _mqtt3_bridge *bridge)
 			return MOSQ_ERR_NOMEM;
 		}
 		new_context->id = local_id;
-		HASH_ADD_KEYPTR(hh_id, db->contexts_by_id, new_context->id, strlen(new_context->id), new_context);
+		HASH_ADD_KEYPTR(hh_id, db->contexts_by_id, new_context->id, local_id_len, new_context);
 	}
 	new_context->bridge = bridge;
 	new_context->is_bridge = true;

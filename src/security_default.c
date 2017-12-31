@@ -511,7 +511,7 @@ static int _pwfile_parse(const char *file, struct _mosquitto_unpwd **root)
 	struct _mosquitto_unpwd *unpwd;
 	char buf[256];
 	char *username, *password;
-	int len;
+	size_t username_len, password_len;
 	char *saveptr = NULL;
 
 	pwfile = _mosquitto_fopen(file, "rt", false);
@@ -535,10 +535,10 @@ static int _pwfile_parse(const char *file, struct _mosquitto_unpwd **root)
 					fclose(pwfile);
 					return MOSQ_ERR_NOMEM;
 				}
-				len = strlen(unpwd->username);
-				while(unpwd->username[len-1] == 10 || unpwd->username[len-1] == 13){
-					unpwd->username[len-1] = '\0';
-					len = strlen(unpwd->username);
+				username_len = strlen(unpwd->username);
+				while(username_len && (unpwd->username[username_len-1] == 10 || unpwd->username[username_len-1] == 13)){
+					unpwd->username[username_len-1] = '\0';
+                    username_len--;
 				}
 				password = strtok_r(NULL, ":", &saveptr);
 				if(password){
@@ -549,13 +549,13 @@ static int _pwfile_parse(const char *file, struct _mosquitto_unpwd **root)
 						_mosquitto_free(unpwd);
 						return MOSQ_ERR_NOMEM;
 					}
-					len = strlen(unpwd->password);
-					while(len && (unpwd->password[len-1] == 10 || unpwd->password[len-1] == 13)){
-						unpwd->password[len-1] = '\0';
-						len = strlen(unpwd->password);
+					password_len = strlen(unpwd->password);
+					while(password_len && (unpwd->password[password_len-1] == 10 || unpwd->password[password_len-1] == 13)){
+						unpwd->password[password_len-1] = '\0';
+                        password_len--;
 					}
 				}
-				HASH_ADD_KEYPTR(hh, *root, unpwd->username, strlen(unpwd->username), unpwd);
+				HASH_ADD_KEYPTR(hh, *root, unpwd->username, username_len, unpwd);
 			}
 		}
 	}
@@ -656,7 +656,7 @@ static int _psk_file_parse(struct mosquitto_db *db)
 
 static int mosquitto__memcmp_const(const void *a, const void *b, size_t len)
 {
-	int i;
+	size_t i;
 	int rc = 0;
 
 	if(!a || !b) return 1;
