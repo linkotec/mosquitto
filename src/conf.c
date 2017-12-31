@@ -365,8 +365,7 @@ int mqtt3_config_parse_args(struct mqtt3_config *config, int argc, char *argv[])
 			if(i<argc-1){
 				config->config_file = _mosquitto_strdup(argv[i+1]);
 				if(!config->config_file){
-					_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Out of memory.");
-					return MOSQ_ERR_NOMEM;
+					goto out_of_memory;
 				}
 
 				if(mqtt3_config_read(config, false)){
@@ -431,8 +430,7 @@ int mqtt3_config_parse_args(struct mqtt3_config *config, int argc, char *argv[])
 		config->listener_count++;
 		config->listeners = _mosquitto_realloc(config->listeners, sizeof(struct _mqtt3_listener)*config->listener_count);
 		if(!config->listeners){
-			_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Out of memory.");
-			return MOSQ_ERR_NOMEM;
+			goto out_of_memory;
 		}
 		memset(&config->listeners[config->listener_count-1], 0, sizeof(struct _mqtt3_listener));
 		if(config->default_listener.port){
@@ -475,11 +473,20 @@ int mqtt3_config_parse_args(struct mqtt3_config *config, int argc, char *argv[])
 	/* Default to drop to mosquitto user if we are privileged and no user specified. */
 	if(!config->user){
 		config->user = _mosquitto_strdup("mosquitto");
+		if(!config->user){
+			goto out_of_memory;
+		}
 	}
+
 	if(config->verbose){
 		config->log_type = INT_MAX;
 	}
+
 	return MOSQ_ERR_SUCCESS;
+
+out_of_memory:
+	_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Out of memory.");
+	return MOSQ_ERR_NOMEM;
 }
 
 int mqtt3_config_read(struct mqtt3_config *config, bool reload)
@@ -536,6 +543,7 @@ int mqtt3_config_read(struct mqtt3_config *config, bool reload)
 	 * function may be called on its own. */
 	if(!config->user){
 		config->user = _mosquitto_strdup("mosquitto");
+		if(!config->user) return MOSQ_ERR_NOMEM;
 	}
 
 	mqtt3_db_limits_set(cr.max_inflight_messages, cr.max_queued_messages);
