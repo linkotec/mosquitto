@@ -81,10 +81,11 @@ static char *fgets_extending(char **buf, int *buflen, FILE *stream)
 		if(endchar == '\n'){
 			return rc;
 		}
+
 		/* No EOL char found, so extend buffer */
 		offset = *buflen-1;
 		*buflen += 1000;
-		newbuf = realloc(*buf, *buflen);
+		newbuf = _mosquitto_realloc(*buf, *buflen);
 		if(!newbuf){
 			return NULL;
 		}
@@ -133,18 +134,25 @@ static void _config_init_reload(struct mqtt3_config *config)
 {
 	int i;
 	/* Set defaults */
-	if(config->acl_file) _mosquitto_free(config->acl_file);
-	config->acl_file = NULL;
+	if(config->acl_file){
+		_mosquitto_free(config->acl_file);
+		config->acl_file = NULL;
+	}
 	config->allow_anonymous = true;
 	config->allow_duplicate_messages = false;
 	config->allow_zero_length_clientid = true;
-	config->auto_id_prefix = NULL;
+	if(config->auto_id_prefix){
+		_mosquitto_free(config->auto_id_prefix);
+		config->auto_id_prefix = NULL;
+	}
 	config->auto_id_prefix_len = 0;
 	config->autosave_interval = 1800;
 	config->autosave_on_changes = false;
-	if(config->clientid_prefixes) _mosquitto_free(config->clientid_prefixes);
+	if(config->clientid_prefixes){
+		_mosquitto_free(config->clientid_prefixes);
+		config->clientid_prefixes = NULL;
+	}
 	config->connection_messages = true;
-	config->clientid_prefixes = NULL;
 	if(config->log_fptr){
 		fclose(config->log_fptr);
 		config->log_fptr = NULL;
@@ -172,16 +180,24 @@ static void _config_init_reload(struct mqtt3_config *config)
 	}
 #endif
 	config->log_timestamp = true;
-	if(config->password_file) _mosquitto_free(config->password_file);
-	config->password_file = NULL;
+	if(config->password_file){
+		_mosquitto_free(config->password_file);
+		config->password_file = NULL;
+	}
 	config->persistence = false;
-	if(config->persistence_location) _mosquitto_free(config->persistence_location);
-	config->persistence_location = NULL;
-	if(config->persistence_file) _mosquitto_free(config->persistence_file);
-	config->persistence_file = NULL;
+	if(config->persistence_location){
+		_mosquitto_free(config->persistence_location);
+		config->persistence_location = NULL;
+	}
+	if(config->persistence_file){
+		_mosquitto_free(config->persistence_file);
+		config->persistence_file = NULL;
+	}
 	config->persistent_client_expiration = 0;
-	if(config->psk_file) _mosquitto_free(config->psk_file);
-	config->psk_file = NULL;
+	if(config->psk_file){
+		_mosquitto_free(config->psk_file);
+		config->psk_file = NULL;
+	}
 	config->queue_qos0_messages = false;
 	config->retry_interval = 20;
 	config->sys_interval = 10;
@@ -258,24 +274,25 @@ void mqtt3_config_cleanup(struct mqtt3_config *config)
 	if(config->user) _mosquitto_free(config->user);
 	if(config->listeners){
 		for(i=0; i<config->listener_count; i++){
-			if(config->listeners[i].host) _mosquitto_free(config->listeners[i].host);
-			if(config->listeners[i].mount_point) _mosquitto_free(config->listeners[i].mount_point);
-			if(config->listeners[i].socks) _mosquitto_free(config->listeners[i].socks);
+			struct _mqtt3_listener *listener = &config->listeners[i];
+			if(listener->host) _mosquitto_free(listener->host);
+			if(listener->mount_point) _mosquitto_free(listener->mount_point);
+			if(listener->socks) _mosquitto_free(listener->socks);
 #ifdef WITH_TLS
-			if(config->listeners[i].cafile) _mosquitto_free(config->listeners[i].cafile);
-			if(config->listeners[i].capath) _mosquitto_free(config->listeners[i].capath);
-			if(config->listeners[i].certfile) _mosquitto_free(config->listeners[i].certfile);
-			if(config->listeners[i].keyfile) _mosquitto_free(config->listeners[i].keyfile);
-			if(config->listeners[i].ciphers) _mosquitto_free(config->listeners[i].ciphers);
-			if(config->listeners[i].psk_hint) _mosquitto_free(config->listeners[i].psk_hint);
-			if(config->listeners[i].crlfile) _mosquitto_free(config->listeners[i].crlfile);
-			if(config->listeners[i].tls_version) _mosquitto_free(config->listeners[i].tls_version);
+			if(listener->cafile) _mosquitto_free(listener->cafile);
+			if(listener->capath) _mosquitto_free(listener->capath);
+			if(listener->certfile) _mosquitto_free(listener->certfile);
+			if(listener->keyfile) _mosquitto_free(listener->keyfile);
+			if(listener->ciphers) _mosquitto_free(listener->ciphers);
+			if(listener->psk_hint) _mosquitto_free(listener->psk_hint);
+			if(listener->crlfile) _mosquitto_free(listener->crlfile);
+			if(listener->tls_version) _mosquitto_free(listener->tls_version);
 #ifdef WITH_WEBSOCKETS
-			if(config->listeners[i].http_dir) _mosquitto_free(config->listeners[i].http_dir);
-			if(!config->listeners[i].ws_context) /* libwebsockets frees its own SSL_CTX */
+			if(listener->http_dir) _mosquitto_free(listener->http_dir);
+			if(!listener->ws_context) /* libwebsockets frees its own SSL_CTX */
 #endif
 			{
-				SSL_CTX_free(config->listeners[i].ssl_ctx);
+				SSL_CTX_free(listener->ssl_ctx);
 			}
 #endif
 		}
@@ -284,36 +301,38 @@ void mqtt3_config_cleanup(struct mqtt3_config *config)
 #ifdef WITH_BRIDGE
 	if(config->bridges){
 		for(i=0; i<config->bridge_count; i++){
-			if(config->bridges[i].name) _mosquitto_free(config->bridges[i].name);
-			if(config->bridges[i].addresses){
-				for(j=0; j<config->bridges[i].address_count; j++){
-					_mosquitto_free(config->bridges[i].addresses[j].address);
+			struct _mqtt3_bridge *bridge = &config->bridges[i];
+			if(bridge->name) _mosquitto_free(bridge->name);
+			if(bridge->addresses){
+				for(j=0; j<bridge->address_count; j++){
+					_mosquitto_free(bridge->addresses[j].address);
 				}
-				_mosquitto_free(config->bridges[i].addresses);
+				_mosquitto_free(bridge->addresses);
 			}
-			if(config->bridges[i].remote_clientid) _mosquitto_free(config->bridges[i].remote_clientid);
-			if(config->bridges[i].remote_username) _mosquitto_free(config->bridges[i].remote_username);
-			if(config->bridges[i].remote_password) _mosquitto_free(config->bridges[i].remote_password);
-			if(config->bridges[i].local_clientid) _mosquitto_free(config->bridges[i].local_clientid);
-			if(config->bridges[i].local_username) _mosquitto_free(config->bridges[i].local_username);
-			if(config->bridges[i].local_password) _mosquitto_free(config->bridges[i].local_password);
-			if(config->bridges[i].topics){
-				for(j=0; j<config->bridges[i].topic_count; j++){
-					if(config->bridges[i].topics[j].topic) _mosquitto_free(config->bridges[i].topics[j].topic);
-					if(config->bridges[i].topics[j].local_prefix) _mosquitto_free(config->bridges[i].topics[j].local_prefix);
-					if(config->bridges[i].topics[j].remote_prefix) _mosquitto_free(config->bridges[i].topics[j].remote_prefix);
-					if(config->bridges[i].topics[j].local_topic) _mosquitto_free(config->bridges[i].topics[j].local_topic);
-					if(config->bridges[i].topics[j].remote_topic) _mosquitto_free(config->bridges[i].topics[j].remote_topic);
+			if(bridge->remote_clientid) _mosquitto_free(bridge->remote_clientid);
+			if(bridge->remote_username) _mosquitto_free(bridge->remote_username);
+			if(bridge->remote_password) _mosquitto_free(bridge->remote_password);
+			if(bridge->local_clientid) _mosquitto_free(bridge->local_clientid);
+			if(bridge->local_username) _mosquitto_free(bridge->local_username);
+			if(bridge->local_password) _mosquitto_free(bridge->local_password);
+			if(bridge->topics){
+				for(j=0; j<bridge->topic_count; j++){
+					struct _mqtt3_bridge_topic *topic = &bridge->topics[j];
+					if(topic->topic) _mosquitto_free(topic->topic);
+					if(topic->local_prefix) _mosquitto_free(topic->local_prefix);
+					if(topic->remote_prefix) _mosquitto_free(topic->remote_prefix);
+					if(topic->local_topic) _mosquitto_free(topic->local_topic);
+					if(topic->remote_topic) _mosquitto_free(topic->remote_topic);
 				}
-				_mosquitto_free(config->bridges[i].topics);
+				_mosquitto_free(bridge->topics);
 			}
-			if(config->bridges[i].notification_topic) _mosquitto_free(config->bridges[i].notification_topic);
+			if(bridge->notification_topic) _mosquitto_free(bridge->notification_topic);
 #ifdef WITH_TLS
-			if(config->bridges[i].tls_version) _mosquitto_free(config->bridges[i].tls_version);
-			if(config->bridges[i].tls_cafile) _mosquitto_free(config->bridges[i].tls_cafile);
+			if(bridge->tls_version) _mosquitto_free(bridge->tls_version);
+			if(bridge->tls_cafile) _mosquitto_free(bridge->tls_cafile);
 #ifdef REAL_WITH_TLS_PSK
-			if(config->bridges[i].tls_psk_identity) _mosquitto_free(config->bridges[i].tls_psk_identity);
-			if(config->bridges[i].tls_psk) _mosquitto_free(config->bridges[i].tls_psk);
+			if(bridge->tls_psk_identity) _mosquitto_free(bridge->tls_psk_identity);
+			if(bridge->tls_psk) _mosquitto_free(bridge->tls_psk);
 #endif
 #endif
 		}
@@ -427,46 +446,50 @@ int mqtt3_config_parse_args(struct mqtt3_config *config, int argc, char *argv[])
 			|| config->default_listener.mount_point
 			|| config->default_listener.protocol != mp_mqtt){
 
-		config->listener_count++;
-		config->listeners = _mosquitto_realloc(config->listeners, sizeof(struct _mqtt3_listener)*config->listener_count);
-		if(!config->listeners){
+		struct _mqtt3_listener *listener;
+		struct _mqtt3_listener *listeners;
+		listeners = _mosquitto_realloc(config->listeners, sizeof(struct _mqtt3_listener)*(config->listener_count+1));
+		if(!listeners){
 			goto out_of_memory;
 		}
-		memset(&config->listeners[config->listener_count-1], 0, sizeof(struct _mqtt3_listener));
+		config->listeners = listeners;
+		listener = &listeners[config->listener_count];
+		config->listener_count++;
+		memset(listener, 0, sizeof(struct _mqtt3_listener));
 		if(config->default_listener.port){
-			config->listeners[config->listener_count-1].port = config->default_listener.port;
+			listener->port = config->default_listener.port;
 		}else{
-			config->listeners[config->listener_count-1].port = 1883;
+			listener->port = 1883;
 		}
 		if(config->default_listener.host){
-			config->listeners[config->listener_count-1].host = config->default_listener.host;
+			listener->host = config->default_listener.host;
 		}else{
-			config->listeners[config->listener_count-1].host = NULL;
+			listener->host = NULL;
 		}
 		if(config->default_listener.mount_point){
-			config->listeners[config->listener_count-1].mount_point = config->default_listener.mount_point;
+			listener->mount_point = config->default_listener.mount_point;
 		}else{
-			config->listeners[config->listener_count-1].mount_point = NULL;
+			listener->mount_point = NULL;
 		}
-		config->listeners[config->listener_count-1].max_connections = config->default_listener.max_connections;
-		config->listeners[config->listener_count-1].protocol = config->default_listener.protocol;
-		config->listeners[config->listener_count-1].client_count = 0;
-		config->listeners[config->listener_count-1].socks = NULL;
-		config->listeners[config->listener_count-1].sock_count = 0;
-		config->listeners[config->listener_count-1].client_count = 0;
-		config->listeners[config->listener_count-1].use_username_as_clientid = config->default_listener.use_username_as_clientid;
+		listener->max_connections = config->default_listener.max_connections;
+		listener->protocol = config->default_listener.protocol;
+		listener->client_count = 0;
+		listener->socks = NULL;
+		listener->sock_count = 0;
+		listener->client_count = 0;
+		listener->use_username_as_clientid = config->default_listener.use_username_as_clientid;
 #ifdef WITH_TLS
-		config->listeners[config->listener_count-1].tls_version = config->default_listener.tls_version;
-		config->listeners[config->listener_count-1].cafile = config->default_listener.cafile;
-		config->listeners[config->listener_count-1].capath = config->default_listener.capath;
-		config->listeners[config->listener_count-1].certfile = config->default_listener.certfile;
-		config->listeners[config->listener_count-1].keyfile = config->default_listener.keyfile;
-		config->listeners[config->listener_count-1].ciphers = config->default_listener.ciphers;
-		config->listeners[config->listener_count-1].psk_hint = config->default_listener.psk_hint;
-		config->listeners[config->listener_count-1].require_certificate = config->default_listener.require_certificate;
-		config->listeners[config->listener_count-1].ssl_ctx = NULL;
-		config->listeners[config->listener_count-1].crlfile = config->default_listener.crlfile;
-		config->listeners[config->listener_count-1].use_identity_as_username = config->default_listener.use_identity_as_username;
+		listener->tls_version = config->default_listener.tls_version;
+		listener->cafile = config->default_listener.cafile;
+		listener->capath = config->default_listener.capath;
+		listener->certfile = config->default_listener.certfile;
+		listener->keyfile = config->default_listener.keyfile;
+		listener->ciphers = config->default_listener.ciphers;
+		listener->psk_hint = config->default_listener.psk_hint;
+		listener->require_certificate = config->default_listener.require_certificate;
+		listener->ssl_ctx = NULL;
+		listener->crlfile = config->default_listener.crlfile;
+		listener->use_identity_as_username = config->default_listener.use_identity_as_username;
 #endif
 	}
 
@@ -526,6 +549,7 @@ int mqtt3_config_read(struct mqtt3_config *config, bool reload)
 		}
 		if(config->persistence_filepath){
 			_mosquitto_free(config->persistence_filepath);
+			config->persistence_filepath = NULL;
 		}
 		if(config->persistence_location && strlen(config->persistence_location)){
 			len = strlen(config->persistence_location) + strlen(config->persistence_file) + 1;
