@@ -102,7 +102,9 @@ static int _conf_attempt_resolve(const char *host, const char *text, int log, co
 
 	memset(&gai_hints, 0, sizeof(struct addrinfo));
 	gai_hints.ai_family = PF_UNSPEC;
+#ifndef _WIN32
 	gai_hints.ai_flags = AI_ADDRCONFIG;
+#endif
 	gai_hints.ai_socktype = SOCK_STREAM;
 	gai_res = NULL;
 	rc = getaddrinfo(host, NULL, &gai_hints, &gai_res);

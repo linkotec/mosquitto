@@ -382,7 +382,9 @@ int _mosquitto_try_connect(struct mosquitto *mosq, const char *host, uint16_t po
 	*sock = INVALID_SOCKET;
 	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_family = PF_UNSPEC;
+#ifndef _WIN32
 	hints.ai_flags = AI_ADDRCONFIG;
+#endif
 	hints.ai_socktype = SOCK_STREAM;
 
 	s = getaddrinfo(host, NULL, &hints, &ainfo);
@@ -1206,6 +1208,7 @@ int _mosquitto_socketpair(mosq_sock_t *pairR, mosq_sock_t *pairW)
 			sa6->sin6_addr = in6addr_loopback;
 			sa6->sin6_port = 0;
 			ss_len = sizeof(struct sockaddr_in6);
+#endif
 		}else{
 			return MOSQ_ERR_INVAL;
 		}
