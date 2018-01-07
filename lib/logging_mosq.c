@@ -31,12 +31,10 @@ int _mosquitto_log_printf(struct mosquitto *mosq, int priority, const char *fmt,
 	assert(mosq);
 	assert(fmt);
 
-	pthread_mutex_lock(&mosq->log_callback_mutex);
 	if(mosq->on_log){
 		len = strlen(fmt) + 500;
 		s = _mosquitto_malloc(len*sizeof(char));
 		if(!s){
-			pthread_mutex_unlock(&mosq->log_callback_mutex);
 			return MOSQ_ERR_NOMEM;
 		}
 
@@ -45,11 +43,13 @@ int _mosquitto_log_printf(struct mosquitto *mosq, int priority, const char *fmt,
 		va_end(va);
 		s[len-1] = '\0'; /* Ensure string is null terminated. */
 
-		mosq->on_log(mosq, mosq->userdata, priority, s);
-
+    	_mosquitto_mutex_acquire(&mosq->log_callback_mutex);
+        if(mosq->on_log){
+		    mosq->on_log(mosq, mosq->userdata, priority, s);
+        }
+		_mosquitto_mutex_release(&mosq->log_callback_mutex);
 		_mosquitto_free(s);
 	}
-	pthread_mutex_unlock(&mosq->log_callback_mutex);
 
 	return MOSQ_ERR_SUCCESS;
 }

@@ -30,31 +30,22 @@ Contributors:
 #endif
 #include <stdlib.h>
 
-#if defined(WITH_THREADING) && !defined(WITH_BROKER)
-#  include <pthread.h>
-#else
-#  include <dummypthread.h>
-#endif
-
 #ifdef WITH_SRV
 #  include <ares.h>
 #endif
 
-#ifdef WIN32
-#	if _MSC_VER < 1600
-		typedef signed char int8_t;
-		typedef unsigned char uint8_t;
-		typedef unsigned short uint16_t;
-		typedef unsigned int uint32_t;
-		typedef unsigned long long uint64_t;
-#	else
-#		include <stdint.h>
-#	endif
+#if defined(_MSC_VER) && (_MSC_VER < 1600)
+  typedef signed char int8_t;
+  typedef unsigned char uint8_t;
+  typedef unsigned short uint16_t;
+  typedef unsigned int uint32_t;
+  typedef unsigned long long uint64_t;
 #else
-#	include <stdint.h>
+#  include <stdint.h>
 #endif
 
 #include "mosquitto.h"
+#include "mutex_mosq.h"
 #include "time_mosq.h"
 #ifdef WITH_BROKER
 #  ifdef __linux__
@@ -192,16 +183,21 @@ struct mosquitto {
 	bool want_write;
 	bool want_connect;
 #if defined(WITH_THREADING) && !defined(WITH_BROKER)
-	pthread_mutex_t callback_mutex;
-	pthread_mutex_t log_callback_mutex;
-	pthread_mutex_t msgtime_mutex;
-	pthread_mutex_t out_packet_mutex;
-	pthread_mutex_t current_out_packet_mutex;
-	pthread_mutex_t state_mutex;
-	pthread_mutex_t in_message_mutex;
-	pthread_mutex_t out_message_mutex;
-	pthread_mutex_t mid_mutex;
+	mosq_mutex_t callback_mutex;
+	mosq_mutex_t log_callback_mutex;
+	mosq_mutex_t msgtime_mutex;
+	mosq_mutex_t out_packet_mutex;
+	mosq_mutex_t current_out_packet_mutex;
+	mosq_mutex_t state_mutex;
+	mosq_mutex_t in_message_mutex;
+	mosq_mutex_t out_message_mutex;
+	mosq_mutex_t mid_mutex;
+#ifdef _WIN32
+	HANDLE thread;
+	HANDLE loop_cancel;
+#else
 	pthread_t thread_id;
+#endif
 #endif
 	bool clean_session;
 #ifdef WITH_BROKER

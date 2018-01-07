@@ -115,9 +115,9 @@ int mosquitto__socks5_send(struct mosquitto *mosq)
 			packet->payload[2] = SOCKS_AUTH_NONE;
 		}
 
-		pthread_mutex_lock(&mosq->state_mutex);
+		_mosquitto_mutex_acquire(&mosq->state_mutex);
 		mosq->state = mosq_cs_socks5_start;
-		pthread_mutex_unlock(&mosq->state_mutex);
+		_mosquitto_mutex_release(&mosq->state_mutex);
 
 		mosq->in_packet.pos = 0;
 		mosq->in_packet.packet_length = 2;
@@ -148,9 +148,9 @@ int mosquitto__socks5_send(struct mosquitto *mosq)
 		packet->payload[5+slen] = MOSQ_MSB(mosq->port);
 		packet->payload[6+slen] = MOSQ_LSB(mosq->port);
 
-		pthread_mutex_lock(&mosq->state_mutex);
+		_mosquitto_mutex_acquire(&mosq->state_mutex);
 		mosq->state = mosq_cs_socks5_request;
-		pthread_mutex_unlock(&mosq->state_mutex);
+		_mosquitto_mutex_release(&mosq->state_mutex);
 
 		mosq->in_packet.pos = 0;
 		mosq->in_packet.packet_length = 5;
@@ -179,9 +179,9 @@ int mosquitto__socks5_send(struct mosquitto *mosq)
 		packet->payload[2+ulen] = plen;
 		memcpy(&(packet->payload[3+ulen]), mosq->socks5_password, plen);
 
-		pthread_mutex_lock(&mosq->state_mutex);
+		_mosquitto_mutex_acquire(&mosq->state_mutex);
 		mosq->state = mosq_cs_socks5_userpass_reply;
-		pthread_mutex_unlock(&mosq->state_mutex);
+		_mosquitto_mutex_release(&mosq->state_mutex);
 
 		mosq->in_packet.pos = 0;
 		mosq->in_packet.packet_length = 2;

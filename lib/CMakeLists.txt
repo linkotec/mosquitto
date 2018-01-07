@@ -3,10 +3,7 @@ add_subdirectory(cpp)
 option(WITH_THREADING "Include client library threading support?" ON)
 if (${WITH_THREADING} STREQUAL ON)
 	add_definitions("-DWITH_THREADING")
-	if (WIN32)
-		set (PTHREAD_LIBRARIES C:\\pthreads\\Pre-built.2\\lib\\x86\\pthreadVC2.lib)
-		set (PTHREAD_INCLUDE_DIR C:\\pthreads\\Pre-built.2\\include)
-	else (WIN32)
+	if (NOT WIN32)
 		find_library(LIBPTHREAD pthread)
 		if (LIBPTHREAD)
 			set (PTHREAD_LIBRARIES pthread)
@@ -14,7 +11,7 @@ if (${WITH_THREADING} STREQUAL ON)
 			set (PTHREAD_LIBRARIES "")
 		endif()
 		set (PTHREAD_INCLUDE_DIR "")
-	endif (WIN32)
+	endif (NOT WIN32)
 else (${WITH_THREADING} STREQUAL ON)
 	set (PTHREAD_LIBRARIES "")
 	set (PTHREAD_INCLUDE_DIR "")
@@ -32,6 +29,7 @@ add_library(libmosquitto SHARED
 	mosquitto.c mosquitto.h
 	mosquitto_internal.h
 	mqtt3_protocol.h
+	mutex_mosq.c mutex_mosq.h
 	net_mosq.c net_mosq.h
 	read_handle.c read_handle.h
 	read_handle_client.c

@@ -107,20 +107,20 @@ void _mosquitto_check_keepalive(struct mosquitto *mosq)
 		return;
 	}
 #endif
-	pthread_mutex_lock(&mosq->msgtime_mutex);
+	_mosquitto_mutex_acquire(&mosq->msgtime_mutex);
 	next_msg_out = mosq->next_msg_out;
 	last_msg_in = mosq->last_msg_in;
-	pthread_mutex_unlock(&mosq->msgtime_mutex);
+	_mosquitto_mutex_release(&mosq->msgtime_mutex);
 	if(mosq->keepalive && mosq->sock != INVALID_SOCKET &&
 			(now >= next_msg_out || now - last_msg_in >= mosq->keepalive)){
 
 		if(mosq->state == mosq_cs_connected && mosq->ping_t == 0){
 			_mosquitto_send_pingreq(mosq);
 			/* Reset last msg times to give the server time to send a pingresp */
-			pthread_mutex_lock(&mosq->msgtime_mutex);
+			_mosquitto_mutex_acquire(&mosq->msgtime_mutex);
 			mosq->last_msg_in = now;
 			mosq->next_msg_out = now + mosq->keepalive;
-			pthread_mutex_unlock(&mosq->msgtime_mutex);
+			_mosquitto_mutex_release(&mosq->msgtime_mutex);
 		}else{
 #ifdef WITH_BROKER
 			if(mosq->listener){
@@ -131,20 +131,20 @@ void _mosquitto_check_keepalive(struct mosquitto *mosq)
 			_mosquitto_socket_close(db, mosq);
 #else
 			_mosquitto_socket_close(mosq);
-			pthread_mutex_lock(&mosq->state_mutex);
+			_mosquitto_mutex_acquire(&mosq->state_mutex);
 			if(mosq->state == mosq_cs_disconnecting){
 				rc = MOSQ_ERR_SUCCESS;
 			}else{
 				rc = 1;
 			}
-			pthread_mutex_unlock(&mosq->state_mutex);
-			pthread_mutex_lock(&mosq->callback_mutex);
+			_mosquitto_mutex_release(&mosq->state_mutex);
+			_mosquitto_mutex_acquire(&mosq->callback_mutex);
 			if(mosq->on_disconnect){
 				mosq->in_callback = true;
 				mosq->on_disconnect(mosq, mosq->userdata, rc);
 				mosq->in_callback = false;
 			}
-			pthread_mutex_unlock(&mosq->callback_mutex);
+			_mosquitto_mutex_release(&mosq->callback_mutex);
 #endif
 		}
 	}
@@ -162,11 +162,11 @@ uint16_t _mosquitto_mid_generate(struct mosquitto *mosq)
 	uint16_t mid;
 	assert(mosq);
 
-	pthread_mutex_lock(&mosq->mid_mutex);
+	_mosquitto_mutex_acquire(&mosq->mid_mutex);
 	mosq->last_mid++;
 	if(mosq->last_mid == 0) mosq->last_mid++;
 	mid = mosq->last_mid;
-	pthread_mutex_unlock(&mosq->mid_mutex);
+	_mosquitto_mutex_release(&mosq->mid_mutex);
 	
 	return mid;
 }
@@ -430,4 +430,3 @@ FILE *_mosquitto_fopen(const char *path, const char *mode, bool restrict_read)
 	}
 #endif
 }
-

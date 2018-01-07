@@ -34,13 +34,13 @@ int _mosquitto_handle_connack(struct mosquitto *mosq)
 	if(rc) return rc;
 	rc = _mosquitto_read_byte(&mosq->in_packet, &result);
 	if(rc) return rc;
-	pthread_mutex_lock(&mosq->callback_mutex);
+	_mosquitto_mutex_acquire(&mosq->callback_mutex);
 	if(mosq->on_connect){
 		mosq->in_callback = true;
 		mosq->on_connect(mosq, mosq->userdata, result);
 		mosq->in_callback = false;
 	}
-	pthread_mutex_unlock(&mosq->callback_mutex);
+	_mosquitto_mutex_release(&mosq->callback_mutex);
 	switch(result){
 		case 0:
 			if(mosq->state != mosq_cs_disconnecting){

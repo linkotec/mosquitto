@@ -80,6 +80,7 @@ Contributors:
 #include <logging_mosq.h>
 #include <memory_mosq.h>
 #include <mqtt3_protocol.h>
+#include <mutex_mosq.h>
 #include <net_mosq.h>
 #include <time_mosq.h>
 #include <util_mosq.h>
@@ -160,14 +161,14 @@ int _mosquitto_packet_queue(struct mosquitto *mosq, struct _mosquitto_packet *pa
 	packet->to_process = packet->packet_length;
 
 	packet->next = NULL;
-	pthread_mutex_lock(&mosq->out_packet_mutex);
+	_mosquitto_mutex_acquire(&mosq->out_packet_mutex);
 	if(mosq->out_packet){
 		mosq->out_packet_last->next = packet;
 	}else{
 		mosq->out_packet = packet;
 	}
 	mosq->out_packet_last = packet;
-	pthread_mutex_unlock(&mosq->out_packet_mutex);
+	_mosquitto_mutex_release(&mosq->out_packet_mutex);
 #ifdef WITH_BROKER
 #  ifdef WITH_WEBSOCKETS
 	if(mosq->wsi){
@@ -860,8 +861,8 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 	if(!mosq) return MOSQ_ERR_INVAL;
 	if(mosq->sock == INVALID_SOCKET) return MOSQ_ERR_NO_CONN;
 
-	pthread_mutex_lock(&mosq->current_out_packet_mutex);
-	pthread_mutex_lock(&mosq->out_packet_mutex);
+	_mosquitto_mutex_acquire(&mosq->current_out_packet_mutex);
+	_mosquitto_mutex_acquire(&mosq->out_packet_mutex);
 	if(mosq->out_packet && !mosq->current_out_packet){
 		mosq->current_out_packet = mosq->out_packet;
 		mosq->out_packet = mosq->out_packet->next;
@@ -869,10 +870,10 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 			mosq->out_packet_last = NULL;
 		}
 	}
-	pthread_mutex_unlock(&mosq->out_packet_mutex);
+	_mosquitto_mutex_release(&mosq->out_packet_mutex);
 
 	if(mosq->state == mosq_cs_connect_pending){
-		pthread_mutex_unlock(&mosq->current_out_packet_mutex);
+		_mosquitto_mutex_release(&mosq->current_out_packet_mutex);
 		return MOSQ_ERR_SUCCESS;
 	}
 
@@ -892,10 +893,10 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 				errno = WSAGetLastError();
 #endif
 				if(errno == EAGAIN || errno == COMPAT_EWOULDBLOCK){
-					pthread_mutex_unlock(&mosq->current_out_packet_mutex);
+					_mosquitto_mutex_release(&mosq->current_out_packet_mutex);
 					return MOSQ_ERR_SUCCESS;
 				}else{
-					pthread_mutex_unlock(&mosq->current_out_packet_mutex);
+					_mosquitto_mutex_release(&mosq->current_out_packet_mutex);
 					switch(errno){
 						case COMPAT_ECONNRESET:
 							return MOSQ_ERR_CONN_LOST;
@@ -915,14 +916,14 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 #  endif
 #else
 		if(((packet->command)&0xF6) == PUBLISH){
-			pthread_mutex_lock(&mosq->callback_mutex);
+			_mosquitto_mutex_acquire(&mosq->callback_mutex);
 			if(mosq->on_publish){
 				/* This is a QoS=0 message */
 				mosq->in_callback = true;
 				mosq->on_publish(mosq, mosq->userdata, packet->mid);
 				mosq->in_callback = false;
 			}
-			pthread_mutex_unlock(&mosq->callback_mutex);
+			_mosquitto_mutex_release(&mosq->callback_mutex);
 		}else if(((packet->command)&0xF0) == DISCONNECT){
 			/* FIXME what cleanup needs doing here? 
 			 * incoming/outgoing messages? */
@@ -931,7 +932,7 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 			/* Start of duplicate, possibly unnecessary code.
 			 * This does leave things in a consistent state at least. */
 			/* Free data and reset values */
-			pthread_mutex_lock(&mosq->out_packet_mutex);
+			_mosquitto_mutex_acquire(&mosq->out_packet_mutex);
 			mosq->current_out_packet = mosq->out_packet;
 			if(mosq->out_packet){
 				mosq->out_packet = mosq->out_packet->next;
@@ -939,30 +940,30 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 					mosq->out_packet_last = NULL;
 				}
 			}
-			pthread_mutex_unlock(&mosq->out_packet_mutex);
+			_mosquitto_mutex_release(&mosq->out_packet_mutex);
 
 			_mosquitto_packet_cleanup(packet);
 			_mosquitto_free(packet);
 
-			pthread_mutex_lock(&mosq->msgtime_mutex);
+			_mosquitto_mutex_acquire(&mosq->msgtime_mutex);
 			mosq->next_msg_out = mosquitto_time() + mosq->keepalive;
-			pthread_mutex_unlock(&mosq->msgtime_mutex);
+			_mosquitto_mutex_release(&mosq->msgtime_mutex);
 			/* End of duplicate, possibly unnecessary code */
 
-			pthread_mutex_lock(&mosq->callback_mutex);
+			_mosquitto_mutex_acquire(&mosq->callback_mutex);
 			if(mosq->on_disconnect){
 				mosq->in_callback = true;
 				mosq->on_disconnect(mosq, mosq->userdata, 0);
 				mosq->in_callback = false;
 			}
-			pthread_mutex_unlock(&mosq->callback_mutex);
-			pthread_mutex_unlock(&mosq->current_out_packet_mutex);
+			_mosquitto_mutex_release(&mosq->callback_mutex);
+			_mosquitto_mutex_release(&mosq->current_out_packet_mutex);
 			return MOSQ_ERR_SUCCESS;
 		}
 #endif
 
 		/* Free data and reset values */
-		pthread_mutex_lock(&mosq->out_packet_mutex);
+		_mosquitto_mutex_acquire(&mosq->out_packet_mutex);
 		mosq->current_out_packet = mosq->out_packet;
 		if(mosq->out_packet){
 			mosq->out_packet = mosq->out_packet->next;
@@ -970,16 +971,16 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 				mosq->out_packet_last = NULL;
 			}
 		}
-		pthread_mutex_unlock(&mosq->out_packet_mutex);
+		_mosquitto_mutex_release(&mosq->out_packet_mutex);
 
 		_mosquitto_packet_cleanup(packet);
 		_mosquitto_free(packet);
 
-		pthread_mutex_lock(&mosq->msgtime_mutex);
+		_mosquitto_mutex_acquire(&mosq->msgtime_mutex);
 		mosq->next_msg_out = mosquitto_time() + mosq->keepalive;
-		pthread_mutex_unlock(&mosq->msgtime_mutex);
+		_mosquitto_mutex_release(&mosq->msgtime_mutex);
 	}
-	pthread_mutex_unlock(&mosq->current_out_packet_mutex);
+	_mosquitto_mutex_release(&mosq->current_out_packet_mutex);
 	return MOSQ_ERR_SUCCESS;
 }
 
@@ -1111,9 +1112,9 @@ int _mosquitto_packet_read(struct mosquitto *mosq)
 					 * This is an arbitrary limit, but with some consideration.
 					 * If a client can't send 1000 bytes in a second it
 					 * probably shouldn't be using a 1 second keep alive. */
-					pthread_mutex_lock(&mosq->msgtime_mutex);
+					_mosquitto_mutex_acquire(&mosq->msgtime_mutex);
 					mosq->last_msg_in = mosquitto_time();
-					pthread_mutex_unlock(&mosq->msgtime_mutex);
+					_mosquitto_mutex_release(&mosq->msgtime_mutex);
 				}
 				return MOSQ_ERR_SUCCESS;
 			}else{
@@ -1144,9 +1145,9 @@ int _mosquitto_packet_read(struct mosquitto *mosq)
 	/* Free data and reset values */
 	_mosquitto_packet_cleanup(&mosq->in_packet);
 
-	pthread_mutex_lock(&mosq->msgtime_mutex);
+	_mosquitto_mutex_acquire(&mosq->msgtime_mutex);
 	mosq->last_msg_in = mosquitto_time();
-	pthread_mutex_unlock(&mosq->msgtime_mutex);
+	_mosquitto_mutex_release(&mosq->msgtime_mutex);
 	return rc;
 }
 

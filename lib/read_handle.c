@@ -120,32 +120,32 @@ int _mosquitto_handle_publish(struct mosquitto *mosq)
 	message->timestamp = mosquitto_time();
 	switch(message->msg.qos){
 		case 0:
-			pthread_mutex_lock(&mosq->callback_mutex);
+			_mosquitto_mutex_acquire(&mosq->callback_mutex);
 			if(mosq->on_message){
 				mosq->in_callback = true;
 				mosq->on_message(mosq, mosq->userdata, &message->msg);
 				mosq->in_callback = false;
 			}
-			pthread_mutex_unlock(&mosq->callback_mutex);
+			_mosquitto_mutex_release(&mosq->callback_mutex);
 			_mosquitto_message_cleanup(&message);
 			return MOSQ_ERR_SUCCESS;
 		case 1:
 			rc = _mosquitto_send_puback(mosq, message->msg.mid);
-			pthread_mutex_lock(&mosq->callback_mutex);
+			_mosquitto_mutex_acquire(&mosq->callback_mutex);
 			if(mosq->on_message){
 				mosq->in_callback = true;
 				mosq->on_message(mosq, mosq->userdata, &message->msg);
 				mosq->in_callback = false;
 			}
-			pthread_mutex_unlock(&mosq->callback_mutex);
+			_mosquitto_mutex_release(&mosq->callback_mutex);
 			_mosquitto_message_cleanup(&message);
 			return rc;
 		case 2:
 			rc = _mosquitto_send_pubrec(mosq, message->msg.mid);
-			pthread_mutex_lock(&mosq->in_message_mutex);
+			_mosquitto_mutex_acquire(&mosq->in_message_mutex);
 			message->state = mosq_ms_wait_for_pubrel;
 			_mosquitto_message_queue(mosq, message, mosq_md_in);
-			pthread_mutex_unlock(&mosq->in_message_mutex);
+			_mosquitto_mutex_release(&mosq->in_message_mutex);
 			return rc;
 		default:
 			_mosquitto_message_cleanup(&message);

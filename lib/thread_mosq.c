@@ -18,12 +18,18 @@ Contributors:
 
 #ifndef WIN32
 #include <unistd.h>
+#else
+#include <process.h>
 #endif
 
 #include <mosquitto_internal.h>
 #include <net_mosq.h>
 
-void *_mosquitto_thread_main(void *obj);
+#ifdef _WIN32
+static unsigned WINAPI _mosquitto_thread_main(void *obj);
+#else
+static void *_mosquitto_thread_main(void *obj);
+#endif
 
 int mosquitto_loop_start(struct mosquitto *mosq)
 {
@@ -31,11 +37,21 @@ int mosquitto_loop_start(struct mosquitto *mosq)
 	if(!mosq || mosq->threaded != mosq_ts_none) return MOSQ_ERR_INVAL;
 
 	mosq->threaded = mosq_ts_self;
+#ifdef _WIN32
+	mosq->thread = (HANDLE) _beginthreadex(NULL, 0, &_mosquitto_thread_main, mosq, 0, NULL);
+	if(mosq->thread == INVALID_HANDLE_VALUE){
+		errno = GetLastError();
+		return MOSQ_ERR_ERRNO;
+	}else{
+		return MOSQ_ERR_SUCCESS;
+	}
+#else
 	if(!pthread_create(&mosq->thread_id, NULL, _mosquitto_thread_main, mosq)){
 		return MOSQ_ERR_SUCCESS;
 	}else{
 		return MOSQ_ERR_ERRNO;
 	}
+#endif
 #else
 	return MOSQ_ERR_NOT_SUPPORTED;
 #endif
@@ -62,12 +78,21 @@ int mosquitto_loop_stop(struct mosquitto *mosq, bool force)
 #endif
 	}
 	
+#ifdef _WIN32
+	if(force){
+		SetEvent(mosq->loop_cancel);
+	}
+	WaitForSingleObject(mosq->thread, INFINITE);
+	mosq->thread = GetCurrentThread();
+	mosq->threaded = mosq_ts_none;
+#else
 	if(force){
 		pthread_cancel(mosq->thread_id);
 	}
 	pthread_join(mosq->thread_id, NULL);
 	mosq->thread_id = pthread_self();
 	mosq->threaded = mosq_ts_none;
+#endif
 
 	return MOSQ_ERR_SUCCESS;
 #else
@@ -76,18 +101,26 @@ int mosquitto_loop_stop(struct mosquitto *mosq, bool force)
 }
 
 #ifdef WITH_THREADING
-void *_mosquitto_thread_main(void *obj)
+#ifdef _WIN32
+static unsigned WINAPI _mosquitto_thread_main(void *obj)
+#else
+static void *_mosquitto_thread_main(void *obj)
+#endif
 {
 	struct mosquitto *mosq = obj;
 
+#ifdef _WIN32
+	if(!mosq) return 0;
+#else
 	if(!mosq) return NULL;
+#endif
 
-	pthread_mutex_lock(&mosq->state_mutex);
+	_mosquitto_mutex_acquire(&mosq->state_mutex);
 	if(mosq->state == mosq_cs_connect_async){
-		pthread_mutex_unlock(&mosq->state_mutex);
+		_mosquitto_mutex_release(&mosq->state_mutex);
 		mosquitto_reconnect(mosq);
 	}else{
-		pthread_mutex_unlock(&mosq->state_mutex);
+		_mosquitto_mutex_release(&mosq->state_mutex);
 	}
 
 	if(!mosq->keepalive){
@@ -98,7 +131,11 @@ void *_mosquitto_thread_main(void *obj)
 		mosquitto_loop_forever(mosq, mosq->keepalive*1000, 1);
 	}
 
+#ifdef _WIN32
+	return 0;
+#else
 	return obj;
+#endif
 }
 #endif
 

@@ -10,6 +10,7 @@ set (MOSQ_SRCS
 	logging.c
 	loop.c
 	../lib/memory_mosq.c ../lib/memory_mosq.h
+	../lib/mutex_mosq.c ../lib/mutex_mosq.h
 	mosquitto.c
 	mosquitto_broker.h
 	net.c

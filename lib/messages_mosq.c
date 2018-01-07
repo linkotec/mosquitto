@@ -157,7 +157,7 @@ void _mosquitto_messages_reconnect_reset(struct mosquitto *mosq)
 	struct mosquitto_message_all *prev = NULL;
 	assert(mosq);
 
-	pthread_mutex_lock(&mosq->in_message_mutex);
+	_mosquitto_mutex_acquire(&mosq->in_message_mutex);
 	message = mosq->in_messages;
 	mosq->in_queue_len = 0;
 	while(message){
@@ -181,10 +181,10 @@ void _mosquitto_messages_reconnect_reset(struct mosquitto *mosq)
 		message = message->next;
 	}
 	mosq->in_messages_last = prev;
-	pthread_mutex_unlock(&mosq->in_message_mutex);
+	_mosquitto_mutex_release(&mosq->in_message_mutex);
 
 
-	pthread_mutex_lock(&mosq->out_message_mutex);
+	_mosquitto_mutex_acquire(&mosq->out_message_mutex);
 	mosq->inflight_messages = 0;
 	message = mosq->out_messages;
 	mosq->out_queue_len = 0;
@@ -208,7 +208,7 @@ void _mosquitto_messages_reconnect_reset(struct mosquitto *mosq)
 		message = message->next;
 	}
 	mosq->out_messages_last = prev;
-	pthread_mutex_unlock(&mosq->out_message_mutex);
+	_mosquitto_mutex_release(&mosq->out_message_mutex);
 }
 
 int _mosquitto_message_remove(struct mosquitto *mosq, uint16_t mid, enum mosquitto_msg_direction dir, struct mosquitto_message_all **message)
@@ -220,7 +220,7 @@ int _mosquitto_message_remove(struct mosquitto *mosq, uint16_t mid, enum mosquit
 	assert(message);
 
 	if(dir == mosq_md_out){
-		pthread_mutex_lock(&mosq->out_message_mutex);
+		_mosquitto_mutex_acquire(&mosq->out_message_mutex);
 		cur = mosq->out_messages;
 		while(cur){
 			if(cur->msg.mid == mid){
@@ -259,24 +259,24 @@ int _mosquitto_message_remove(struct mosquitto *mosq, uint16_t mid, enum mosquit
 						}
 						rc = _mosquitto_send_publish(mosq, cur->msg.mid, cur->msg.topic, cur->msg.payloadlen, cur->msg.payload, cur->msg.qos, cur->msg.retain, cur->dup);
 						if(rc){
-							pthread_mutex_unlock(&mosq->out_message_mutex);
+							_mosquitto_mutex_release(&mosq->out_message_mutex);
 							return rc;
 						}
 					}
 				}else{
-					pthread_mutex_unlock(&mosq->out_message_mutex);
+					_mosquitto_mutex_release(&mosq->out_message_mutex);
 					return MOSQ_ERR_SUCCESS;
 				}
 				cur = cur->next;
 			}
-			pthread_mutex_unlock(&mosq->out_message_mutex);
+			_mosquitto_mutex_release(&mosq->out_message_mutex);
 			return MOSQ_ERR_SUCCESS;
 		}else{
-			pthread_mutex_unlock(&mosq->out_message_mutex);
+			_mosquitto_mutex_release(&mosq->out_message_mutex);
 			return MOSQ_ERR_NOT_FOUND;
 		}
 	}else{
-		pthread_mutex_lock(&mosq->in_message_mutex);
+		_mosquitto_mutex_acquire(&mosq->in_message_mutex);
 		cur = mosq->in_messages;
 		while(cur){
 			if(cur->msg.mid == mid){
@@ -299,7 +299,7 @@ int _mosquitto_message_remove(struct mosquitto *mosq, uint16_t mid, enum mosquit
 			cur = cur->next;
 		}
 
-		pthread_mutex_unlock(&mosq->in_message_mutex);
+		_mosquitto_mutex_release(&mosq->in_message_mutex);
 		if(found){
 			return MOSQ_ERR_SUCCESS;
 		}else{
@@ -309,7 +309,7 @@ int _mosquitto_message_remove(struct mosquitto *mosq, uint16_t mid, enum mosquit
 }
 
 #ifdef WITH_THREADING
-void _mosquitto_message_retry_check_actual(struct mosquitto *mosq, struct mosquitto_message_all *messages, pthread_mutex_t *mutex)
+void _mosquitto_message_retry_check_actual(struct mosquitto *mosq, struct mosquitto_message_all *messages, mosq_mutex_t *mutex)
 #else
 void _mosquitto_message_retry_check_actual(struct mosquitto *mosq, struct mosquitto_message_all *messages)
 #endif
@@ -318,7 +318,7 @@ void _mosquitto_message_retry_check_actual(struct mosquitto *mosq, struct mosqui
 	assert(mosq);
 
 #ifdef WITH_THREADING
-	pthread_mutex_lock(mutex);
+	_mosquitto_mutex_acquire(mutex);
 #endif
 
 	while(messages){
@@ -347,7 +347,7 @@ void _mosquitto_message_retry_check_actual(struct mosquitto *mosq, struct mosqui
 		messages = messages->next;
 	}
 #ifdef WITH_THREADING
-	pthread_mutex_unlock(mutex);
+	_mosquitto_mutex_release(mutex);
 #endif
 }
 
@@ -373,18 +373,18 @@ int _mosquitto_message_out_update(struct mosquitto *mosq, uint16_t mid, enum mos
 	struct mosquitto_message_all *message;
 	assert(mosq);
 
-	pthread_mutex_lock(&mosq->out_message_mutex);
+	_mosquitto_mutex_acquire(&mosq->out_message_mutex);
 	message = mosq->out_messages;
 	while(message){
 		if(message->msg.mid == mid){
 			message->state = state;
 			message->timestamp = mosquitto_time();
-			pthread_mutex_unlock(&mosq->out_message_mutex);
+			_mosquitto_mutex_release(&mosq->out_message_mutex);
 			return MOSQ_ERR_SUCCESS;
 		}
 		message = message->next;
 	}
-	pthread_mutex_unlock(&mosq->out_message_mutex);
+	_mosquitto_mutex_release(&mosq->out_message_mutex);
 	return MOSQ_ERR_NOT_FOUND;
 }
 

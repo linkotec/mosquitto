@@ -83,13 +83,13 @@ int _mosquitto_handle_pubackcomp(struct mosquitto *mosq, const char *type)
 
 	if(!_mosquitto_message_delete(mosq, mid, mosq_md_out)){
 		/* Only inform the client the message has been sent once. */
-		pthread_mutex_lock(&mosq->callback_mutex);
+		_mosquitto_mutex_acquire(&mosq->callback_mutex);
 		if(mosq->on_publish){
 			mosq->in_callback = true;
 			mosq->on_publish(mosq, mosq->userdata, mid);
 			mosq->in_callback = false;
 		}
-		pthread_mutex_unlock(&mosq->callback_mutex);
+		_mosquitto_mutex_release(&mosq->callback_mutex);
 	}
 #endif
 
@@ -154,13 +154,13 @@ int _mosquitto_handle_pubrel(struct mosquitto_db *db, struct mosquitto *mosq)
 	if(!_mosquitto_message_remove(mosq, mid, mosq_md_in, &message)){
 		/* Only pass the message on if we have removed it from the queue - this
 		 * prevents multiple callbacks for the same message. */
-		pthread_mutex_lock(&mosq->callback_mutex);
+		_mosquitto_mutex_acquire(&mosq->callback_mutex);
 		if(mosq->on_message){
 			mosq->in_callback = true;
 			mosq->on_message(mosq, mosq->userdata, &message->msg);
 			mosq->in_callback = false;
 		}
-		pthread_mutex_unlock(&mosq->callback_mutex);
+		_mosquitto_mutex_release(&mosq->callback_mutex);
 		_mosquitto_message_cleanup(&message);
 	}
 #endif
@@ -201,13 +201,13 @@ int _mosquitto_handle_suback(struct mosquitto *mosq)
 		i++;
 	}
 #ifndef WITH_BROKER
-	pthread_mutex_lock(&mosq->callback_mutex);
+	_mosquitto_mutex_acquire(&mosq->callback_mutex);
 	if(mosq->on_subscribe){
 		mosq->in_callback = true;
 		mosq->on_subscribe(mosq, mosq->userdata, mid, qos_count, granted_qos);
 		mosq->in_callback = false;
 	}
-	pthread_mutex_unlock(&mosq->callback_mutex);
+	_mosquitto_mutex_release(&mosq->callback_mutex);
 #endif
 	_mosquitto_free(granted_qos);
 
@@ -228,13 +228,13 @@ int _mosquitto_handle_unsuback(struct mosquitto *mosq)
 	rc = _mosquitto_read_uint16(&mosq->in_packet, &mid);
 	if(rc) return rc;
 #ifndef WITH_BROKER
-	pthread_mutex_lock(&mosq->callback_mutex);
+	_mosquitto_mutex_acquire(&mosq->callback_mutex);
 	if(mosq->on_unsubscribe){
 		mosq->in_callback = true;
 	   	mosq->on_unsubscribe(mosq, mosq->userdata, mid);
 		mosq->in_callback = false;
 	}
-	pthread_mutex_unlock(&mosq->callback_mutex);
+	_mosquitto_mutex_release(&mosq->callback_mutex);
 #endif
 
 	return MOSQ_ERR_SUCCESS;
