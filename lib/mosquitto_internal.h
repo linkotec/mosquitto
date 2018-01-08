@@ -194,6 +194,7 @@ struct mosquitto {
 	mosq_mutex_t mid_mutex;
 #ifdef _WIN32
 	HANDLE thread;
+	DWORD thread_id;
 	HANDLE loop_cancel;
 #else
 	pthread_t thread_id;

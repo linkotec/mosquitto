@@ -57,6 +57,103 @@ extern int run;
 extern int g_clients_expired;
 #endif
 
+#if defined(_WIN32_WINNT) && (_WIN32_WINNT < 0x0600)
+
+#define POLLRDNORM  0x0100
+#define POLLRDBAND  0x0200
+#define POLLIN      (POLLRDNORM | POLLRDBAND)
+#define POLLPRI     0x0400
+
+#define POLLWRNORM  0x0010
+#define POLLOUT     (POLLWRNORM)
+#define POLLWRBAND  0x0020
+
+#define POLLERR     0x0001
+#define POLLHUP     0x0002
+#define POLLNVAL    0x0004
+
+struct pollfd {
+	mosq_sock_t fd;
+	short events;
+	short revents;
+};
+
+static int _mosq_poll(struct pollfd *ufds, unsigned int nfds, int timeout)
+{
+	fd_set readfds, writefds, exceptfds;
+	struct timeval local_timeout;
+	struct timeval *ptimeout;
+	int fd, maxfd, ret;
+	unsigned int u;
+	
+	FD_ZERO(&readfds);
+	FD_ZERO(&writefds);
+	FD_ZERO(&exceptfds);
+	maxfd = INVALID_SOCKET;
+
+	for (u = 0; u < nfds; ++u) {
+		fd = ufds[u].fd; 
+		ufds[u].revents = 0;
+		if (fd < 0)
+			continue;
+		if (fd > maxfd) {
+			maxfd = fd;
+		}
+		if (ufds[u].events & POLLIN)
+			FD_SET(fd, &readfds);
+		if (ufds[u].events & POLLOUT)
+			FD_SET(fd, &writefds);
+		if (ufds[u].events & POLLPRI)
+			FD_SET(fd, &exceptfds);
+	}
+
+	if (maxfd == INVALID_SOCKET) {
+		Sleep(timeout);
+		return 0;
+	}
+
+	if (timeout < 0) {
+		ptimeout = NULL;
+	} else {
+		if (timeout > 0) {
+			local_timeout.tv_sec = timeout / 1000;
+			local_timeout.tv_usec = (timeout % 1000) * 1000;
+		}
+		else if (!timeout) {
+			local_timeout.tv_sec = 0;
+			local_timeout.tv_usec = 0;
+		}
+		ptimeout = &local_timeout;
+	}
+
+	ret = select(maxfd + 1, readfds.fd_count ? &readfds : NULL,
+		writefds.fd_count ? &writefds : NULL, &exceptfds, ptimeout);
+	if (ret < 0)
+		return -1;
+	if (ret == 0)
+		return 0;
+
+	ret = 0;
+	for (u = 0; u < nfds; ++u) {
+		fd = ufds[u].fd;
+		if (fd < 0)
+			continue;
+		if (FD_ISSET(fd, &readfds))
+			ufds[u].revents |= POLLIN;
+		if (FD_ISSET(fd, &writefds))
+			ufds[u].revents |= POLLOUT;
+		if (FD_ISSET(fd, &exceptfds))
+			ufds[u].revents |= POLLPRI;
+		if (ufds[u].revents)
+			++ret;
+	}
+
+	return ret;
+}
+#else
+#define _mosq_poll(fdarray, nfds, timeout) WSAPoll((fdarray), (nfds), (timeout))
+#endif
+
 static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pollfds);
 
 #ifdef WITH_WEBSOCKETS
@@ -352,7 +449,7 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
 		fdcount = poll(pollfds, pollfd_index, 100);
 		sigprocmask(SIG_SETMASK, &origsig, NULL);
 #else
-		fdcount = WSAPoll(pollfds, pollfd_index, 100);
+		fdcount = _mosq_poll(pollfds, pollfd_index, 100);
 #endif
 		if(fdcount == -1){
 			_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error in poll: %s.", strerror(errno));

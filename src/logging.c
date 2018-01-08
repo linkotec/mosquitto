@@ -107,7 +107,7 @@ int _mosquitto_log_vprintf(struct mosquitto *mosq, int priority, const char *fmt
 	char *st;
 	int len;
 #ifdef WIN32
-	char *sp;
+	const char *sp;
 #endif
 	const char *topic;
 	int syslog_priority;

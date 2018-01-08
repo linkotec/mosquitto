@@ -34,6 +34,14 @@ if (WIN32)
 	set (SHAREDEST .)
 	add_definitions("-D_CRT_SECURE_NO_WARNINGS")
 	add_definitions("-D_CRT_NONSTDC_NO_DEPRECATE")
+	# target is W2K or newer
+	#add_definitions("-D_WIN32_WINNT=0x0500")
+	# target is W2K SP1 or newer
+	#add_definitions("-D_WIN32_WINNT=0x0500 -DNTDDI_VERSION=0x05000100")
+	# target is XP or newer
+	#add_definitions("-D_WIN32_WINNT=0x0501")
+	# target is Vista or newer
+	add_definitions("-D_WIN32_WINNT=0x0600")
 else (WIN32)
 	set (BINDIR bin)
 	set (SBINDIR sbin)
@@ -50,6 +58,10 @@ else (WIN32)
 	set (MANDIR "${DATAROOTDIR}/man")
 	set (SHAREDIR "${DATAROOTDIR}/mosquitto")
 endif (WIN32)
+
+if(MINGW)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static-libgcc")
+endif(MINGW)
 
 option(WITH_TLS
 	"Include SSL/TLS support?" ON)

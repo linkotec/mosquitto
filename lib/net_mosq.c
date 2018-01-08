@@ -1203,6 +1203,7 @@ int _mosquitto_socketpair(mosq_sock_t *pairR, mosq_sock_t *pairW)
 			sa->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 			sa->sin_port = 0;
 			ss_len = sizeof(struct sockaddr_in);
+#if !defined(NTDDI_VERSION) || (NTDDI_VERSION >= NTDDI_WIN2KSP1)
 		}else if(family[i] == AF_INET6){
 			sa6->sin6_family = family[i];
 			sa6->sin6_addr = in6addr_loopback;
@@ -1239,9 +1240,14 @@ int _mosquitto_socketpair(mosq_sock_t *pairR, mosq_sock_t *pairW)
 			sa->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 			ss_len = sizeof(struct sockaddr_in);
 		}else if(family[i] == AF_INET6){
+#if !defined(NTDDI_VERSION) || (NTDDI_VERSION >= NTDDI_WIN2KSP1)
 			sa6->sin6_family = family[i];
 			sa6->sin6_addr = in6addr_loopback;
 			ss_len = sizeof(struct sockaddr_in6);
+#else
+			COMPAT_CLOSE(listensock);
+			continue;
+#endif
 		}
 
 		spR = socket(family[i], SOCK_STREAM, IPPROTO_TCP);

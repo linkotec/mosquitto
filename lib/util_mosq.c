@@ -369,12 +369,14 @@ FILE *_mosquitto_fopen(const char *path, const char *mode, bool restrict_read)
 			EXPLICIT_ACCESS ea;
 			PACL pacl = NULL;
 			char username[UNLEN + 1];
-			int ulen = UNLEN;
+			DWORD ulen = UNLEN;
 			SECURITY_DESCRIPTOR sd;
 			int fd;
 			FILE *fptr;
 
-			GetUserName(username, &ulen);
+			if (!GetUserNameA(username, &ulen)) {
+				return NULL;
+			}
 			if (!InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION)) {
 				return NULL;
 			}

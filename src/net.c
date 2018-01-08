@@ -424,8 +424,11 @@ int mqtt3_socket_listen(struct _mqtt3_listener *listener)
 		ss_opt = 1;
 		setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &ss_opt, sizeof(ss_opt));
 #endif
+
+#ifdef IPPROTO_IPV6
 		ss_opt = 1;
 		setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, &ss_opt, sizeof(ss_opt));
+#endif
 
 		if(_mosquitto_socket_nonblock(sock)){
 			return 1;

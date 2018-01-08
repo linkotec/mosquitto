@@ -38,7 +38,7 @@ int mosquitto_loop_start(struct mosquitto *mosq)
 
 	mosq->threaded = mosq_ts_self;
 #ifdef _WIN32
-	mosq->thread = (HANDLE) _beginthreadex(NULL, 0, &_mosquitto_thread_main, mosq, 0, NULL);
+	mosq->thread = (HANDLE) _beginthreadex(NULL, 0, &_mosquitto_thread_main, mosq, 0, (unsigned int*) &mosq->thread_id);
 	if(mosq->thread == INVALID_HANDLE_VALUE){
 		errno = GetLastError();
 		return MOSQ_ERR_ERRNO;
@@ -82,8 +82,10 @@ int mosquitto_loop_stop(struct mosquitto *mosq, bool force)
 	if(force){
 		SetEvent(mosq->loop_cancel);
 	}
-	WaitForSingleObject(mosq->thread, INFINITE);
-	mosq->thread = GetCurrentThread();
+	if (mosq->thread_id != GetCurrentThreadId()) {
+		WaitForSingleObject(mosq->thread, INFINITE);
+	}
+	mosq->thread_id = GetCurrentThreadId();
 	mosq->threaded = mosq_ts_none;
 #else
 	if(force){

@@ -113,7 +113,7 @@ struct mosquitto *mosquitto_new(const char *id, bool clean_session, void *userda
 			errno = ENOMEM;
 			return NULL;
 		}
-		mosq->thread = GetCurrentThread();
+		mosq->thread_id = GetCurrentThreadId();
 #else
 		mosq->thread_id = pthread_self();
 #endif
@@ -226,7 +226,7 @@ int mosquitto_reinitialise(struct mosquitto *mosq, const char *id, bool clean_se
 	_mosquitto_mutex_init(&mosq->out_message_mutex);
 	_mosquitto_mutex_init(&mosq->mid_mutex);
 #ifdef _WIN32
-    mosq->thread = GetCurrentThread();
+    mosq->thread_id = GetCurrentThreadId();
 #else
 	mosq->thread_id = pthread_self();
 #endif
@@ -294,7 +294,7 @@ void _mosquitto_destroy(struct mosquitto *mosq)
 
 #ifdef WITH_THREADING
 #ifdef _WIN32
-	if(mosq->threaded == mosq_ts_self && mosq->thread != GetCurrentThread()){
+	if(mosq->threaded == mosq_ts_self && mosq->thread_id != GetCurrentThreadId()){
 		SetEvent(mosq->loop_cancel);
 		WaitForSingleObject(mosq->thread, INFINITE);
 		mosq->threaded = mosq_ts_none;
@@ -1030,7 +1030,7 @@ int mosquitto_loop_forever(struct mosquitto *mosq, int timeout, int max_packets)
 
 	if(!mosq) return MOSQ_ERR_INVAL;
 
-#ifdef _WIN32
+#if defined(_WIN32) && defined(WITH_THREADING)
 	ResetEvent(mosq->loop_cancel);
 #endif
 
@@ -1044,7 +1044,7 @@ int mosquitto_loop_forever(struct mosquitto *mosq, int timeout, int max_packets)
 			if (reconnects !=0 && rc == MOSQ_ERR_SUCCESS){
 				reconnects = 0;
 			}
-#ifdef _WIN32
+#if defined(_WIN32) && defined(WITH_THREADING)
 			if (WaitForSingleObject(mosq->loop_cancel, 0) == WAIT_OBJECT_0)
 				return 0;
 #endif
@@ -1091,9 +1091,13 @@ int mosquitto_loop_forever(struct mosquitto *mosq, int timeout, int max_packets)
 					reconnects++;
 				}
 
-#ifdef WIN32
+#if defined(WIN32)
+#if defined(WITH_THREADING)
 				if (WaitForSingleObject(mosq->loop_cancel, reconnect_delay*1000) == WAIT_OBJECT_0)
 					return 0;
+#else
+				Sleep(reconnect_delay*1000);
+#endif
 #else
 				sleep(reconnect_delay);
 #endif

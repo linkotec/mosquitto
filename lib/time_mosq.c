@@ -20,7 +20,6 @@ Contributors:
 #endif
 
 #ifdef WIN32
-#  define _WIN32_WINNT _WIN32_WINNT_VISTA
 #  include <windows.h>
 #else
 #  include <unistd.h>
@@ -30,33 +29,74 @@ Contributors:
 #include "mosquitto.h"
 #include "time_mosq.h"
 
-#ifdef WIN32
-static bool tick64 = false;
+#if defined(_WIN32_WINNT) && (_WIN32_WINNT < _WIN32_WINNT_VISTA)
+typedef DWORD (WINAPI* GetTickCountFunc)(void);
+typedef ULONGLONG (WINAPI* GetTickCount64Func)(void);
 
-void _windows_time_version_check(void)
-{
-	OSVERSIONINFO vi;
+static GetTickCountFunc fnGetTickCount = NULL;
+static GetTickCount64Func fnGetTickCount64 = NULL;
 
-	tick64 = false;
+static ULONGLONG ticks64 = 0;
+static LONG Ticks_Initialized = 0;
 
-	memset(&vi, 0, sizeof(OSVERSIONINFO));
-	vi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-	if(GetVersionEx(&vi)){
-		if(vi.dwMajorVersion > 5){
-			tick64 = true;
-		}
-	}
-}
+#if defined(_MSC_VER) && (_MSC_VER >= 1400)
+#include <intrin.h>
+
+#pragma intrinsic(_InterlockedCompareExchange)
+/* the non-intrinsic version is only available since Vista */
+#pragma intrinsic(_InterlockedCompareExchange64)
 #endif
+#endif
+
+void _mosquitto_time_lib_init()
+{
+#if defined(_WIN32_WINNT) && (_WIN32_WINNT < _WIN32_WINNT_VISTA)
+	if (_InterlockedCompareExchange(&Ticks_Initialized, 1, 0) == 0) {
+		HMODULE kernel32_dll = GetModuleHandle(TEXT("kernel32.dll"));
+		if (kernel32_dll) {
+			fnGetTickCount64 = (GetTickCount64Func) GetProcAddress(kernel32_dll, "GetTickCount64");
+			if (!fnGetTickCount64) {
+				fnGetTickCount = (GetTickCountFunc) GetProcAddress(kernel32_dll, "GetTickCount");
+				ticks64 = fnGetTickCount();
+			}
+		}
+		Ticks_Initialized = -1;
+	} else {
+		do {
+			SwitchToThread();
+		} while (Ticks_Initialized != -1);
+	}
+#endif
+}
 
 time_t mosquitto_time(void)
 {
 #ifdef WIN32
-	if(tick64){
-		return GetTickCount64()/1000;
-	}else{
-		return GetTickCount()/1000; /* FIXME - need to deal with overflow. */
+#if defined(_WIN32_WINNT) && (_WIN32_WINNT < _WIN32_WINNT_VISTA)
+	LARGE_INTEGER old_ticks64, new_ticks64;
+	long abs_difference;
+
+	if (Ticks_Initialized != -1) {
+		_mosquitto_time_lib_init();
 	}
+
+	if (fnGetTickCount64) {
+		return (time_t) ((LONGLONG) fnGetTickCount64() / 1000);
+	}
+
+	old_ticks64.QuadPart = _InterlockedCompareExchange64((LONGLONG volatile*) &ticks64, 0, 0);
+	abs_difference = (long) fnGetTickCount() - old_ticks64.LowPart;
+	new_ticks64.QuadPart = old_ticks64.QuadPart + abs_difference;
+
+	if (abs_difference < INT_MIN/2) {
+		new_ticks64.QuadPart = old_ticks64.QuadPart + (DWORD) abs_difference;
+		_InterlockedCompareExchange64((LONGLONG volatile*) &ticks64, new_ticks64.QuadPart, old_ticks64.QuadPart);
+	}
+
+	return (time_t) ((LONGLONG) new_ticks64.QuadPart / 1000);
+#else
+	return (time_t) ((LONGLONG) GetTickCount64() / 1000);
+#endif
 #elif _POSIX_TIMERS>0 && defined(_POSIX_MONOTONIC_CLOCK)
 	struct timespec tp;
 
