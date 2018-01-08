@@ -37,6 +37,35 @@ Contributors:
 
 extern int tls_ex_index_mosq;
 
+#if defined(NTDDI_VERSION) && (NTDDI_VERSION < NTDDI_VISTA)
+static int mosq_inet_pton(int af, const char *src, void *dst)
+{
+	char address[128];
+	struct sockaddr_storage ss;
+	int size = sizeof(ss);
+
+	if (strcpy_s(address, sizeof(address), src))
+		return 0;
+
+	if (WSAStringToAddressA(address, af, NULL, (struct sockaddr*) &ss, &size))
+		return 0;
+
+	switch(af) {
+	case AF_INET:
+		*((struct in_addr*) dst) = ((struct sockaddr_in*)&ss)->sin_addr;
+		break;
+	case AF_INET6:
+		*((struct in6_addr*) dst) = ((struct sockaddr_in6*)&ss)->sin6_addr;
+		break;
+	default:
+		return 1;
+	}
+	return 0;
+}
+#else
+#define mosq_inet_pton(AF, SRC, DST) inet_pton((AF), (SRC), (DST))
+#endif
+
 int _mosquitto_server_certificate_verify(int preverify_ok, X509_STORE_CTX *ctx)
 {
 	/* Preverify should have already checked expiry, revocation.
@@ -114,13 +143,8 @@ int _mosquitto_verify_certificate_hostname(X509 *cert, const char *hostname)
 	int ipv6_ok;
 	int ipv4_ok;
 
-#ifdef WIN32
-	ipv6_ok = InetPton(AF_INET6, hostname, &ipv6_addr);
-	ipv4_ok = InetPton(AF_INET, hostname, &ipv4_addr);
-#else
-	ipv6_ok = inet_pton(AF_INET6, hostname, &ipv6_addr);
-	ipv4_ok = inet_pton(AF_INET, hostname, &ipv4_addr);
-#endif
+	ipv6_ok = mosq_inet_pton(AF_INET6, hostname, &ipv6_addr);
+	ipv4_ok = mosq_inet_pton(AF_INET, hostname, &ipv4_addr);
 
 	san = X509_get_ext_d2i(cert, NID_subject_alt_name, NULL, NULL);
 	if(san){

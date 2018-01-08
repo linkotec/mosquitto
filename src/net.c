@@ -63,6 +63,34 @@ static int tls_ex_index_listener = -1;
 extern unsigned int g_socket_connections;
 #endif
 
+#if defined(NTDDI_VERSION) && (NTDDI_VERSION < NTDDI_VISTA)
+static const char* mosq_inet_ntop(int af, const void *src, char *dst, socklen_t size)
+{
+	struct sockaddr_storage ss;
+	unsigned long dst_size = size;
+
+	memset(&ss, 0, sizeof(ss));
+	ss.ss_family = af;
+
+	switch(af) {
+	case AF_INET:
+		((struct sockaddr_in*) &ss)->sin_addr = *(struct in_addr*) src;
+		break;
+	case AF_INET6:
+		((struct sockaddr_in6*) &ss)->sin6_addr = *(struct in6_addr*) src;
+		break;
+	default:
+		return NULL;
+	}
+
+	if (!WSAAddressToStringA((struct sockaddr*) &ss, sizeof(ss), NULL, dst, &dst_size))
+		return NULL;
+
+	return dst;
+}
+#else
+#define mosq_inet_ntop(AF, SRC, DST, SIZE) inet_ntop((AF), (SRC), (DST), (SIZE))
+#endif
 
 static void net__print_error(int log, const char *format_str)
 {
@@ -519,11 +547,11 @@ int _mosquitto_socket_get_address(mosq_sock_t sock, char *buf, int len)
 	addrlen = sizeof(addr);
 	if(!getpeername(sock, (struct sockaddr *)&addr, &addrlen)){
 		if(addr.ss_family == AF_INET){
-			if(inet_ntop(AF_INET, &((struct sockaddr_in *)&addr)->sin_addr.s_addr, buf, len)){
+			if(mosq_inet_ntop(AF_INET, &((struct sockaddr_in *)&addr)->sin_addr.s_addr, buf, len)){
 				return 0;
 			}
 		}else if(addr.ss_family == AF_INET6){
-			if(inet_ntop(AF_INET6, &((struct sockaddr_in6 *)&addr)->sin6_addr.s6_addr, buf, len)){
+			if(mosq_inet_ntop(AF_INET6, &((struct sockaddr_in6 *)&addr)->sin6_addr.s6_addr, buf, len)){
 				return 0;
 			}
 		}
