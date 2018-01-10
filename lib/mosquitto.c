@@ -166,7 +166,7 @@ int mosquitto_reinitialise(struct mosquitto *mosq, const char *id, bool clean_se
 		}
 		mosq->id = _mosquitto_strdup(id);
 	}else{
-		mosq->id = (char *)_mosquitto_calloc(24, sizeof(char));
+		mosq->id = (char*)_mosquitto_malloc(24);
 		if(!mosq->id){
 			return MOSQ_ERR_NOMEM;
 		}
@@ -175,10 +175,10 @@ int mosquitto_reinitialise(struct mosquitto *mosq, const char *id, bool clean_se
 		mosq->id[2] = 's';
 		mosq->id[3] = 'q';
 		mosq->id[4] = '/';
-
 		for(i=5; i<23; i++){
 			mosq->id[i] = (rand()%73)+48;
 		}
+		mosq->id[23] = '\0';
 	}
 	mosq->in_packet.payload = NULL;
 	_mosquitto_packet_cleanup(&mosq->in_packet);

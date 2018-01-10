@@ -31,6 +31,10 @@ Contributors:
 #  include <uuid/uuid.h>
 #endif
 
+#ifdef WITH_TLS
+#  include <openssl/rand.h>
+#endif
+
 #ifdef WITH_WEBSOCKETS
 #  include <libwebsockets.h>
 #endif
@@ -44,12 +48,16 @@ static char *client_id_gen(struct mosquitto_db *db)
 	char *client_id;
 #ifdef WITH_UUID
 	uuid_t uuid;
+#elif WITH_TLS
+	static const char alnum[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	unsigned char rnd[23];
+	int i;
 #else
 	int i;
 #endif
 
 #ifdef WITH_UUID
-	client_id = (char *)_mosquitto_calloc(37 + db->config->auto_id_prefix_len, sizeof(char));
+	client_id = (char *)_mosquitto_malloc(1 + 36 + db->config->auto_id_prefix_len, sizeof(char));
 	if(!client_id){
 		return NULL;
 	}
@@ -58,8 +66,24 @@ static char *client_id_gen(struct mosquitto_db *db)
 	}
 	uuid_generate_random(uuid);
 	uuid_unparse_lower(uuid, &client_id[db->config->auto_id_prefix_len]);
+#elif WITH_TLS
+	client_id = (char *)_mosquitto_malloc(1 + sizeof(rnd) + db->config->auto_id_prefix_len);
+	if(!client_id){
+		return NULL;
+	}
+	if(db->config->auto_id_prefix){
+		memcpy(client_id, db->config->auto_id_prefix, db->config->auto_id_prefix_len);
+	}
+	if(!RAND_bytes(rnd, sizeof(rnd))){
+		free(client_id);
+		return NULL;
+	}
+	for(i=0; i<sizeof(rnd); ++i){
+		client_id[i+db->config->auto_id_prefix_len] = alnum[rnd[i] % (sizeof(alnum) - 1)];
+	}
+	client_id[i+db->config->auto_id_prefix_len] = '\0';
 #else
-	client_id = (char *)_mosquitto_calloc(65 + db->config->auto_id_prefix_len, sizeof(char));
+	client_id = (char *)_mosquitto_malloc(1 + 64 + db->config->auto_id_prefix_len, sizeof(char));
 	if(!client_id){
 		return NULL;
 	}
@@ -69,7 +93,7 @@ static char *client_id_gen(struct mosquitto_db *db)
 	for(i=0; i<64; i++){
 		client_id[i+db->config->auto_id_prefix_len] = (rand()%73)+48;
 	}
-	client_id[i] = '\0';
+	client_id[i+db->config->auto_id_prefix_len] = '\0';
 #endif
 	return client_id;
 }
