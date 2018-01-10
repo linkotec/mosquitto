@@ -57,7 +57,7 @@ static char *client_id_gen(struct mosquitto_db *db)
 #endif
 
 #ifdef WITH_UUID
-	client_id = (char *)_mosquitto_malloc(1 + 36 + db->config->auto_id_prefix_len, sizeof(char));
+	client_id = (char *)_mosquitto_malloc(1 + 36 + db->config->auto_id_prefix_len);
 	if(!client_id){
 		return NULL;
 	}
@@ -83,7 +83,7 @@ static char *client_id_gen(struct mosquitto_db *db)
 	}
 	client_id[i+db->config->auto_id_prefix_len] = '\0';
 #else
-	client_id = (char *)_mosquitto_malloc(1 + 64 + db->config->auto_id_prefix_len, sizeof(char));
+	client_id = (char *)_mosquitto_malloc(1 + 64 + db->config->auto_id_prefix_len);
 	if(!client_id){
 		return NULL;
 	}
